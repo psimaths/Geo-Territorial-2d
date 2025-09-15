@@ -1,43 +1,8 @@
 import numpy as np
 import itertools
-
-# =============================================================================
-# Global Constants and Precomputed Data
-# =============================================================================
-
-edge_length = 100
-
-# Convert corner positions to a NumPy array for vectorized operations.
-corner_positions = np.array([
-    [0.0, 0.0, 1.0],
-    [0.8944271909999159, 0.0, 0.4472135954999579],
-    [0.27639320225002106, 0.8506508083520399, 0.4472135954999579],
-    [-0.7236067977499788, 0.5257311121191337, 0.4472135954999579],
-    [-0.723606797749979, -0.5257311121191335, 0.4472135954999579],
-    [0.27639320225002084, -0.85065080835204, 0.4472135954999579],
-    [0.7236067977499789, 0.5257311121191336, -0.4472135954999579],
-    [-0.27639320225002095, 0.85065080835204, -0.4472135954999579],
-    [-0.8944271909999159, 1.0953573965284052e-16, -0.4472135954999579],
-    [-0.2763932022500211, -0.8506508083520399, -0.4472135954999579],
-    [0.7236067977499788, -0.5257311121191338, -0.4472135954999579],
-    [0.0, 0.0, -1.0]
-])
-
-edge_number_to_vertices = [
-    [0, 1], [0, 2], [0, 3], [0, 4], [0, 5],
-    [1, 2], [2, 3], [3, 4], [4, 5], [1, 5],
-    [1, 10], [1, 6], [2, 6], [2, 7], [3, 7], [3, 8], [4, 8], [4, 9], [5, 9], [5, 10],
-    [6, 7], [7, 8], [8, 9], [9, 10], [6, 10],
-    [6, 11], [7, 11], [8, 11], [9, 11], [10, 11]
-]
-
-face_number_to_corners = [
-    [0, 1, 2], [0, 2, 3], [0, 3, 4], [0, 4, 5], [0, 1, 5],
-    [1, 2, 6], [2, 3, 7], [3, 4, 8], [4, 5, 9], [1, 5, 10],
-    [1, 6, 10], [2, 6, 7], [3, 7, 8], [4, 8, 9], [5, 9, 10],
-    [6, 7, 11], [7, 8, 11], [8, 9, 11], [9, 10, 11], [6, 10, 11]
-]
-
+from constants import (
+    edge_length, corner_positions, edge_number_to_vertices, face_number_to_corners
+)
 
 # -------------------------------------------------------------------------
 # Build dictionaries for O(1) lookups.
@@ -338,19 +303,5 @@ def position_to_nearest_region(point: list | np.ndarray) -> list:
     predicted_offset = predict_round_offset(matrix_coords)
     face_coords = [face_coords_raw[0] + predicted_offset[0], face_coords_raw[1] + predicted_offset[1]]
     approx_region = face_coords_to_region(face_coords, sorted_corners, face)
-
-    """
-    This gets some coordintes on the face but its not quite accurate so we have to do this local check.
-    Theoretically we should be able to skip it if we do the correction properly.
-    Its not too much a performance drag but its a lot of extra code
-
-    We only ever add or subract one to face_coords when we do the correction.
-    we can check if the sum of the matrix_coords is less than or more than the sum of the face coords and that will tell us which side were on
-    with the exeption of the spherical geometry quirk
-    [2.49435395e+00 1.50286075e+00 1.11022302e-16]
-    here on the sphere its closers to [3,1] but rounds to [2,2] which it is closest to post projection
-    I dont imagine this will be a issue in practice
-    """
-
    
     return approx_region

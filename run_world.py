@@ -8,10 +8,15 @@ from structure import (
     all_regions, region_to_border_regions,
     region_to_position
 )
+from constants import (
+    screen_width, screen_height, block_size, cam_radius_default, 
+    cam_angle_step, cam_radius_step, cam_radius_min, cam_angle_y_min,
+    fov, color_red, color_green, color_white, color_black,
+    color_range_min, color_range_max, target_fps
+)
 
 # Initialize pygame
 pygame.init()
-screen_width, screen_height = 800, 600
 screen = pygame.display.set_mode((screen_width, screen_height))
 pygame.display.set_caption("Geodesic Icosahedral Polygon Viewer")
 clock = pygame.time.Clock()
@@ -45,7 +50,9 @@ def update_geodesic():
     colors = {}
     for region in regions:
         key = tuple(region)
-        colors[key] = (random.randint(50, 255), random.randint(50, 255), random.randint(50, 255))
+        colors[key] = (random.randint(color_range_min, color_range_max), 
+                      random.randint(color_range_min, color_range_max), 
+                      random.randint(color_range_min, color_range_max))
     return colors
 
 # Global state
@@ -57,12 +64,11 @@ def run():
     vertex_colors = update_geodesic()
     selected_region = None
     neighbor_regions = []
-    block_size = 1
 
     # Global camera parameters
     cam_angle_x = 0
     cam_angle_y = pi / 4  # initial vertical angle
-    cam_radius = 3.0
+    cam_radius = cam_radius_default
     
     while running:
         for event in pygame.event.get():
@@ -74,7 +80,6 @@ def run():
                     mx, my = event.pos
                     ndc_x = (mx / screen_width) * 2 - 1
                     ndc_y = 1 - (my / screen_height) * 2
-                    fov = pi / 3
                     aspect = screen_width / screen_height
                     cam_pos = np.array([cam_radius * cos(cam_angle_x) * sin(cam_angle_y),
                                         cam_radius * sin(cam_angle_x) * sin(cam_angle_y),
@@ -97,19 +102,19 @@ def run():
                     result = region_to_border_regions(list(selected_region))
                     neighbor_regions = [tuple(r) for r in result] if result else []
                 elif event.key == pygame.K_LEFT:
-                    cam_angle_x -= 0.1
+                    cam_angle_x -= cam_angle_step
                 elif event.key == pygame.K_RIGHT:
-                    cam_angle_x += 0.1
+                    cam_angle_x += cam_angle_step
                 elif event.key == pygame.K_UP:
-                    cam_angle_y = max(0.1, cam_angle_y - 0.1)
+                    cam_angle_y = max(cam_angle_y_min, cam_angle_y - cam_angle_step)
                 elif event.key == pygame.K_DOWN:
-                    cam_angle_y = min(pi - 0.1, cam_angle_y + 0.1)
+                    cam_angle_y = min(pi - cam_angle_y_min, cam_angle_y + cam_angle_step)
                 elif event.key in (pygame.K_EQUALS, pygame.K_PLUS):
-                    cam_radius = max(1.5, cam_radius - 0.2)
+                    cam_radius = max(cam_radius_min, cam_radius - cam_radius_step)
                 elif event.key == pygame.K_MINUS:
-                    cam_radius += 0.2
+                    cam_radius += cam_radius_step
 
-        screen.fill((0, 0, 0))
+        screen.fill(color_black)
         cam_pos = np.array([cam_radius * cos(cam_angle_x) * sin(cam_angle_y),
                             cam_radius * sin(cam_angle_x) * sin(cam_angle_y),
                             cam_radius * cos(cam_angle_y)])
@@ -117,7 +122,6 @@ def run():
         up = np.array([0, 0, 1])
         right = np.cross(forward, up)
         up = np.cross(right, forward)
-        fov = pi / 3
         aspect = screen_width / screen_height
 
         for x in range(0, screen_width, block_size):
@@ -131,22 +135,22 @@ def run():
                     region = position_to_nearest_region(hit)
                     
                     region_key = tuple(region)
-                    color = vertex_colors.get(region_key, (255, 255, 255))
+                    color = vertex_colors.get(region_key, color_white)
 
                     if selected_region == region_key:
-                        color = (255, 0, 0)
+                        color = color_red
                     if selected_region is not None and region_key in neighbor_regions:
-                        color = (0, 255, 0)
+                        color = color_green
 
                     pygame.draw.rect(screen, color, (x, y, block_size, block_size))
 
         # Render FPS counter in the top right corner
         font = pygame.font.SysFont(None, 24)
-        fps_text = font.render(f"FPS: {int(clock.get_fps())}", True, (255, 255, 255))
+        fps_text = font.render(f"FPS: {int(clock.get_fps())}", True, color_white)
         screen.blit(fps_text, (screen_width - fps_text.get_width() - 10, 10))
 
         pygame.display.flip()
-        clock.tick(30)
+        clock.tick(target_fps)
 
     pygame.quit()
 
