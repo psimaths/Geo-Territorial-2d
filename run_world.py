@@ -5,7 +5,8 @@ import math
 from math import pi, cos, sin
 from structure import (
     position_to_nearest_region,
-    all_regions, region_to_border_regions
+    all_regions, region_to_border_regions,
+    region_to_position
 )
 
 # Initialize pygame
@@ -56,7 +57,7 @@ def run():
     vertex_colors = update_geodesic()
     selected_region = None
     neighbor_regions = []
-    block_size = 2
+    block_size = 1
 
     # Global camera parameters
     cam_angle_x = 0
@@ -86,7 +87,7 @@ def run():
                     pixel_dir = pixel_dir / np.linalg.norm(pixel_dir)
                     hit = ray_sphere_intersection(cam_pos, pixel_dir)
                     if hit is not None:
-                        region, approx_region = position_to_nearest_region(hit)
+                        region = position_to_nearest_region(hit)
                         selected_region = tuple(region)
                     else:
                         selected_region = None
@@ -127,12 +128,10 @@ def run():
                 pixel_dir = pixel_dir / np.linalg.norm(pixel_dir)
                 hit = ray_sphere_intersection(cam_pos, pixel_dir)
                 if hit is not None:
-                    region, approx_region = position_to_nearest_region(hit)
-                    if pygame.key.get_pressed()[pygame.K_t]:
-                        region = approx_region
+                    region = position_to_nearest_region(hit)
+                    
                     region_key = tuple(region)
                     color = vertex_colors.get(region_key, (255, 255, 255))
-                    
 
                     if selected_region == region_key:
                         color = (255, 0, 0)

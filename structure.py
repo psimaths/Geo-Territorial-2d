@@ -5,7 +5,7 @@ import itertools
 # Global Constants and Precomputed Data
 # =============================================================================
 
-edge_length = 5
+edge_length = 100
 
 # Convert corner positions to a NumPy array for vectorized operations.
 corner_positions = np.array([
@@ -294,24 +294,7 @@ def get_offset_cheating(approx_region: list, point: list) -> list:
         # bloddy edge case just get it wrong
         return best_region, (0, 0)
 
-def position_to_nearest_region(point: list | np.ndarray) -> list:
-    point = np.array(point)
-    # Vectorized computation for corner distances.
-    dists = np.sum((corner_positions - point) ** 2, axis=1)
-    best_three = np.argsort(dists)[:3]
-    sorted_corners = sorted(best_three)
-    # Lookup face based on the three closest corners.
-    face = face_lookup.get(tuple(sorted_corners))
-    if face is None:
-        face = 0  # Fallback (should not occur)
-    # Use precomputed inverse transform to compute matrix coordinates.
-    c0 = face_origin[face]
-    n_vec = face_transform[face][2]
-    # Project the point onto the face plane.
-    factor = np.dot(c0, n_vec) / np.dot(point, n_vec)
-    p_proj = point * factor
-    matrix_coords = np.dot(p_proj - c0, face_inv_transform[face])
-    face_coords = [round(matrix_coords[0]), round(matrix_coords[1])]
+def face_coords_to_region(face_coords: list, sorted_corners: list, face: int) -> list:
     if face_coords == [0, 0]:
         approx_region = [sorted_corners[0]]
     elif face_coords == [edge_length, 0]:
@@ -329,6 +312,32 @@ def position_to_nearest_region(point: list | np.ndarray) -> list:
         approx_region = [edge_lookup[key], face_coords[1]]
     else:
         approx_region = [face, face_coords[0], face_coords[1]]
+    
+    return approx_region
+
+def position_to_nearest_region(point: list | np.ndarray) -> list:
+    point = np.array(point)
+    # Vectorized computation for corner distances.
+    dists = np.sum((corner_positions - point) ** 2, axis=1)
+    best_three = np.argsort(dists)[:3]
+    sorted_corners = sorted(best_three)
+    # Lookup face based on the three closest corners.
+    face = face_lookup.get(tuple(sorted_corners))
+    if face is None:
+        face = 0  # Fallback (should not occur)
+    # Use precomputed inverse transform to compute matrix coordinates.
+    c0 = face_origin[face]
+    n_vec = face_transform[face][2]
+    # Project the point onto the face plane.
+    factor = np.dot(c0, n_vec) / np.dot(point, n_vec)
+    p_proj = point * factor
+    matrix_coords = np.dot(p_proj - c0, face_inv_transform[face])
+    
+    face_coords_raw = [round(matrix_coords[0]), round(matrix_coords[1])]
+
+    predicted_offset = predict_round_offset(matrix_coords)
+    face_coords = [face_coords_raw[0] + predicted_offset[0], face_coords_raw[1] + predicted_offset[1]]
+    approx_region = face_coords_to_region(face_coords, sorted_corners, face)
 
     """
     This gets some coordintes on the face but its not quite accurate so we have to do this local check.
@@ -343,14 +352,5 @@ def position_to_nearest_region(point: list | np.ndarray) -> list:
     I dont imagine this will be a issue in practice
     """
 
-    best_region, offset_true = get_offset_cheating(approx_region, point)
-    predicted_offset = predict_round_offset(matrix_coords)
-
-    if offset_true != predicted_offset and len(best_region) == len(approx_region) == 3:
-        pos_best = region_to_position(best_region)
-        pos_predicted = region_to_position((approx_region[0], approx_region[1] + predicted_offset[0], approx_region[2] + predicted_offset[1]))
-        if np.linalg.norm(pos_predicted - point)-np.linalg.norm(pos_best - point) > 0.005:
-            print(f"Our function screwed up. It predicted the offset {predicted_offset} but the true offset was {offset_true} for the matrix coords {list([float(round(f, 4)) for f in matrix_coords[0:2]])}")
-            print(f"The distance between the true position and the point was {np.linalg.norm(pos_best - point)}\n The distance between the predicted position and the point was {np.linalg.norm(pos_predicted - point)} ")
-            print(f"difference in distance: {np.linalg.norm(pos_predicted - point)-np.linalg.norm(pos_best - point)} \n")
-    return best_region, approx_region
+   
+    return approx_region
