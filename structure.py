@@ -5,7 +5,7 @@ import itertools
 # Global Constants and Precomputed Data
 # =============================================================================
 
-edge_length = 30
+edge_length = 5
 
 # Convert corner positions to a NumPy array for vectorized operations.
 corner_positions = np.array([
@@ -232,6 +232,67 @@ def region_to_position(region: tuple) -> np.ndarray:
     pos = np.dot(np.array(matrix_coords), face_transform[face]) + face_origin[face]
     return pos / np.linalg.norm(pos)
 
+def point_in_triangle(P, tri):
+    """
+    Check if point P = (px, py) lies inside triangle tri = [(x1,y1), (x2,y2), (x3,y3)]
+    Returns True if inside (including edges), False otherwise.
+    """
+    (x1, y1), (x2, y2), (x3, y3) = tri
+    px, py = P
+
+    # Compute signed areas (cross products)
+    d1 = (px - x2) * (y1 - y2) - (py - y2) * (x1 - x2)
+    d2 = (px - x3) * (y2 - y3) - (py - y3) * (x2 - x3)
+    d3 = (px - x1) * (y3 - y1) - (py - y1) * (x3 - x1)
+
+    # Check if all have same sign (or zero, meaning on the edge)
+    has_neg = (d1 < 0) or (d2 < 0) or (d3 < 0)
+    has_pos = (d1 > 0) or (d2 > 0) or (d3 > 0)
+
+    return not (has_neg and has_pos)
+
+def predict_round_offset(matrix_coords) -> list:
+    # if matrix_coords fits into some rounding triangle then we will only return that round offset
+    # The V1+ triangle has corners [1/2, 0], [1/3, 1/3], [1/2, 1/2]
+    offsetted_coords = float(matrix_coords[0] - round(matrix_coords[0])), float(matrix_coords[1] - round(matrix_coords[1]))
+    
+    if point_in_triangle(offsetted_coords, [(1/2, 0), (1/3, 1/3), (1/2, 1/2)]):
+        # V1+ triangle
+        return (1, 0)
+
+    if point_in_triangle(offsetted_coords, [(0, 1/2), (1/3, 1/3), (1/2, 1/2)]):
+        # V2+ triangle
+        return (0, 1)
+        
+    if point_in_triangle(offsetted_coords, [(-1/2, 0), (-1/3, -1/3), (-1/2, -1/2)]):
+        # V1- triangle
+        return (-1, 0)
+
+    if point_in_triangle(offsetted_coords, [(0, -1/2), (-1/3, -1/3), (-1/2, -1/2)]):
+        # V2- triangle
+        return (0, -1)
+
+    return (0, 0)
+
+def get_offset_cheating(approx_region: list, point: list) -> list:
+    candidates = [approx_region] + region_to_border_regions(approx_region)
+    best_region = approx_region
+    best_dist = float('inf')
+    for candidate in candidates:
+        # Cache key conversion (lists to tuples) for region_to_position.
+        candidate_key = tuple(candidate)
+        pos_candidate = region_to_position(candidate_key)
+        d = (pos_candidate[0] - point[0]) ** 2 + (pos_candidate[1] - point[1]) ** 2 + (pos_candidate[2] - point[2]) ** 2
+        if d < best_dist:
+            best_dist = d
+            best_region = candidate
+    if best_region == approx_region:
+        return best_region, (0, 0)
+    elif len(best_region) == len(approx_region) == 3:
+        return best_region, (best_region[1] - approx_region[1], best_region[2] - approx_region[2])
+    else:
+        # bloddy edge case just get it wrong
+        return best_region, (0, 0)
 
 def position_to_nearest_region(point: list | np.ndarray) -> list:
     point = np.array(point)
@@ -268,16 +329,28 @@ def position_to_nearest_region(point: list | np.ndarray) -> list:
         approx_region = [edge_lookup[key], face_coords[1]]
     else:
         approx_region = [face, face_coords[0], face_coords[1]]
-    # Evaluate candidate regions (approximate region and its borders) to pick the nearest.
-    candidates = [approx_region] + region_to_border_regions(approx_region)
-    best_region = approx_region
-    best_dist = float('inf')
-    for candidate in candidates:
-        # Cache key conversion (lists to tuples) for region_to_position.
-        candidate_key = tuple(candidate)
-        pos_candidate = region_to_position(candidate_key)
-        d = (pos_candidate[0] - point[0]) ** 2 + (pos_candidate[1] - point[1]) ** 2 + (pos_candidate[2] - point[2]) ** 2
-        if d < best_dist:
-            best_dist = d
-            best_region = candidate
-    return best_region
+
+    """
+    This gets some coordintes on the face but its not quite accurate so we have to do this local check.
+    Theoretically we should be able to skip it if we do the correction properly.
+    Its not too much a performance drag but its a lot of extra code
+
+    We only ever add or subract one to face_coords when we do the correction.
+    we can check if the sum of the matrix_coords is less than or more than the sum of the face coords and that will tell us which side were on
+    with the exeption of the spherical geometry quirk
+    [2.49435395e+00 1.50286075e+00 1.11022302e-16]
+    here on the sphere its closers to [3,1] but rounds to [2,2] which it is closest to post projection
+    I dont imagine this will be a issue in practice
+    """
+
+    best_region, offset_true = get_offset_cheating(approx_region, point)
+    predicted_offset = predict_round_offset(matrix_coords)
+
+    if offset_true != predicted_offset and len(best_region) == len(approx_region) == 3:
+        pos_best = region_to_position(best_region)
+        pos_predicted = region_to_position((approx_region[0], approx_region[1] + predicted_offset[0], approx_region[2] + predicted_offset[1]))
+        if np.linalg.norm(pos_predicted - point)-np.linalg.norm(pos_best - point) > 0.005:
+            print(f"Our function screwed up. It predicted the offset {predicted_offset} but the true offset was {offset_true} for the matrix coords {list([float(round(f, 4)) for f in matrix_coords[0:2]])}")
+            print(f"The distance between the true position and the point was {np.linalg.norm(pos_best - point)}\n The distance between the predicted position and the point was {np.linalg.norm(pos_predicted - point)} ")
+            print(f"difference in distance: {np.linalg.norm(pos_predicted - point)-np.linalg.norm(pos_best - point)} \n")
+    return best_region, approx_region
