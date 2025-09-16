@@ -5,7 +5,8 @@ import math
 from math import pi, cos, sin
 from structure import (
     position_to_nearest_region,
-    region_to_border_regions
+    region_to_border_regions,
+    region_to_position
 )
 
 from constants import *
@@ -15,6 +16,11 @@ pygame.init()
 screen = pygame.display.set_mode((screen_width, screen_height))
 pygame.display.set_caption("Geodesic Icosahedral Polygon Viewer")
 clock = pygame.time.Clock()
+
+# Load the world map image
+world_image = pygame.image.load("world_nasa_big.png")
+world_width = world_image.get_width()
+world_height = world_image.get_height()
 
 
 
@@ -40,14 +46,53 @@ def ray_sphere_intersection(ray_origin, ray_dir, sphere_center=np.array([0, 0, 0
         return None
     return ray_origin + t * ray_dir
 
+def position_to_lat_lon(position):
+    """Convert 3D sphere position to latitude and longitude in radians."""
+    x, y, z = position
+    # Normalize the position (should already be normalized, but just in case)
+    norm = np.linalg.norm(position)
+    if norm > 0:
+        x, y, z = x/norm, y/norm, z/norm
+    
+    # Calculate latitude (elevation angle from xy-plane)
+    lat = math.asin(z)  # Range: [-π/2, π/2]
+    
+    # Calculate longitude (azimuth angle in xy-plane)
+    lon = math.atan2(y, x)  # Range: [-π, π]
+    
+    return lat, lon
+
+def lat_lon_to_image_coords(lat, lon, img_width, img_height):
+    """Convert latitude/longitude to image pixel coordinates."""
+    # Convert latitude from [-π/2, π/2] to [0, img_height-1]
+    # Note: Image typically has +Y pointing down, so we flip latitude
+    pixel_y = int(((-lat + pi/2) / pi) * (img_height - 1))
+    
+    # Convert longitude from [-π, π] to [0, img_width-1]
+    pixel_x = int(((lon + pi) / (2*pi)) * (img_width - 1))
+    
+    # Clamp to image bounds
+    pixel_x = max(0, min(img_width - 1, pixel_x))
+    pixel_y = max(0, min(img_height - 1, pixel_y))
+    
+    return pixel_x, pixel_y
+
+def sample_world_color(position):
+    """Sample color from world image based on 3D position."""
+    lat, lon = position_to_lat_lon(position)
+    pixel_x, pixel_y = lat_lon_to_image_coords(lat, lon, world_width, world_height)
+    
+    # Get color from the world image
+    color = world_image.get_at((pixel_x, pixel_y))
+    return (color.r, color.g, color.b)
+
 def assign_region_color(region_key, region_colors):
-    """Assign a random color to a region if it doesn't already have one."""
+    """Assign a color to a region based on its geographic position."""
     if region_key not in region_colors:
-        region_colors[region_key] = (
-            random.randint(color_range_min, color_range_max), 
-            random.randint(color_range_min, color_range_max), 
-            random.randint(color_range_min, color_range_max)
-        )
+        # Get the 3D position for this region
+        position = region_to_position(region_key)
+        # Sample color from world map
+        region_colors[region_key] = sample_world_color(position)
     return region_colors[region_key]
 
 # Global state
@@ -141,7 +186,7 @@ def run():
 
         # Render FPS counter in the top right corner
         font = pygame.font.SysFont(None, 24)
-        fps_text = font.render(f"FPS: {int(clock.get_fps())}", True, color_white)
+        fps_text = font.render(f"FPS: {round(clock.get_fps(),3)}", True, color_white)
         screen.blit(fps_text, (screen_width - fps_text.get_width() - 10, 10))
 
         pygame.display.flip()
