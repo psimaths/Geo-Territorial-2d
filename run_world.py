@@ -5,15 +5,10 @@ import math
 from math import pi, cos, sin
 from structure import (
     position_to_nearest_region,
-    all_regions, region_to_border_regions,
-    region_to_position
+    region_to_border_regions
 )
-from constants import (
-    screen_width, screen_height, block_size, cam_radius_default, 
-    cam_angle_step, cam_radius_step, cam_radius_min, cam_angle_y_min,
-    fov, color_red, color_green, color_white, color_black,
-    color_range_min, color_range_max, target_fps
-)
+
+from constants import *
 
 # Initialize pygame
 pygame.init()
@@ -45,15 +40,15 @@ def ray_sphere_intersection(ray_origin, ray_dir, sphere_center=np.array([0, 0, 0
         return None
     return ray_origin + t * ray_dir
 
-def update_geodesic():
-    regions = all_regions()
-    colors = {}
-    for region in regions:
-        key = tuple(region)
-        colors[key] = (random.randint(color_range_min, color_range_max), 
-                      random.randint(color_range_min, color_range_max), 
-                      random.randint(color_range_min, color_range_max))
-    return colors
+def assign_region_color(region_key, region_colors):
+    """Assign a random color to a region if it doesn't already have one."""
+    if region_key not in region_colors:
+        region_colors[region_key] = (
+            random.randint(color_range_min, color_range_max), 
+            random.randint(color_range_min, color_range_max), 
+            random.randint(color_range_min, color_range_max)
+        )
+    return region_colors[region_key]
 
 # Global state
 
@@ -61,7 +56,7 @@ def update_geodesic():
 
 def run():
     running = True
-    vertex_colors = update_geodesic()
+    region_colors = {}  # Dictionary to store colors only for regions we've seen
     selected_region = None
     neighbor_regions = []
 
@@ -135,7 +130,7 @@ def run():
                     region = position_to_nearest_region(hit)
                     
                     region_key = tuple(region)
-                    color = vertex_colors.get(region_key, color_white)
+                    color = assign_region_color(region_key, region_colors)
 
                     if selected_region == region_key:
                         color = color_red

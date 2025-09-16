@@ -1,8 +1,6 @@
 import numpy as np
 import itertools
-from constants import (
-    edge_length, corner_positions, edge_number_to_vertices, face_number_to_corners
-)
+from constants import *
 
 # -------------------------------------------------------------------------
 # Build dictionaries for O(1) lookups.
