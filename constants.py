@@ -10,7 +10,7 @@ edge_length = 100 # Goal is to push to 4096 number of regions is 10*x^2+2
 # Screen/display constants
 screen_width = 800
 screen_height = 600
-block_size = 2
+block_size = 5
 
 # Camera constants
 cam_radius_default = 3.0

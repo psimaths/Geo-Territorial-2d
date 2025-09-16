@@ -2,6 +2,4 @@ __pycache__
 venv
 .idea
 .DS_Store
-output.prof
-profile.html
-profile.json
+images

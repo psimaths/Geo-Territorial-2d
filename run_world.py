@@ -18,7 +18,7 @@ pygame.display.set_caption("Geodesic Icosahedral Polygon Viewer")
 clock = pygame.time.Clock()
 
 # Load the world map image
-world_image = pygame.image.load("world_nasa_big.png")
+world_image = pygame.image.load("images/world.png")
 world_width = world_image.get_width()
 world_height = world_image.get_height()
 
@@ -149,9 +149,9 @@ def run():
                     cam_angle_y = max(cam_angle_y_min, cam_angle_y - cam_angle_step)
                 elif event.key == pygame.K_DOWN:
                     cam_angle_y = min(pi - cam_angle_y_min, cam_angle_y + cam_angle_step)
-                elif event.key in (pygame.K_EQUALS, pygame.K_PLUS):
+                elif event.key == pygame.K_PERIOD:  # . key for zoom in
                     cam_radius = max(cam_radius_min, cam_radius - cam_radius_step)
-                elif event.key == pygame.K_MINUS:
+                elif event.key == pygame.K_SLASH:  # / key for zoom out
                     cam_radius += cam_radius_step
 
         screen.fill(color_black)
