@@ -5,7 +5,7 @@ import numpy as np
 # =============================================================================
 
 # Basic geometric parameters
-edge_length = 100 # Goal is to push to 4096 number of regions is 10*x^2+2 
+edge_length = 1000 # Goal is to push to 4096 number of regions is 10*x^2+2 
 
 # Screen/display constants
 screen_width = 800
@@ -16,7 +16,7 @@ block_size = 5
 cam_radius_default = 3.0
 cam_angle_step = 0.1
 cam_radius_step = 0.2
-cam_radius_min = 1.5
+cam_radius_min = 1
 cam_angle_y_min = 0.1
 fov = np.pi / 3  # Field of view
 

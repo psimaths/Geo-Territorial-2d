@@ -110,6 +110,10 @@ def run():
     cam_angle_y = pi / 4  # initial vertical angle
     cam_radius = cam_radius_default
     
+    # Mouse drag state
+    is_dragging = False
+    last_mouse_pos = None
+    
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -117,42 +121,62 @@ def run():
 
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
-                    mx, my = event.pos
-                    ndc_x = (mx / screen_width) * 2 - 1
-                    ndc_y = 1 - (my / screen_height) * 2
-                    aspect = screen_width / screen_height
-                    cam_pos = np.array([cam_radius * cos(cam_angle_x) * sin(cam_angle_y),
-                                        cam_radius * sin(cam_angle_x) * sin(cam_angle_y),
-                                        cam_radius * cos(cam_angle_y)])
-                    forward = -cam_pos / np.linalg.norm(cam_pos)
-                    up = np.array([0, 0, 1])
-                    right = np.cross(forward, up)
-                    up = np.cross(right, forward)
-                    pixel_dir = forward + ndc_x * right * math.tan(fov / 2) * aspect + ndc_y * up * math.tan(fov / 2)
-                    pixel_dir = pixel_dir / np.linalg.norm(pixel_dir)
-                    hit = ray_sphere_intersection(cam_pos, pixel_dir)
-                    if hit is not None:
-                        region = position_to_nearest_region(hit)
-                        selected_region = tuple(region)
-                    else:
-                        selected_region = None
+                    is_dragging = True
+                    last_mouse_pos = event.pos
+                    
+            elif event.type == pygame.MOUSEBUTTONUP:
+                if event.button == 1:
+                    if is_dragging and last_mouse_pos is not None:
+                        # Check if this was a click (minimal movement) rather than a drag
+                        current_pos = event.pos
+                        distance_moved = math.sqrt((current_pos[0] - last_mouse_pos[0])**2 + (current_pos[1] - last_mouse_pos[1])**2)
+                        if distance_moved < 5:  # Threshold for click vs drag
+                            mx, my = event.pos
+                            ndc_x = (mx / screen_width) * 2 - 1
+                            ndc_y = 1 - (my / screen_height) * 2
+                            aspect = screen_width / screen_height
+                            cam_pos = np.array([cam_radius * cos(cam_angle_x) * sin(cam_angle_y),
+                                                cam_radius * sin(cam_angle_x) * sin(cam_angle_y),
+                                                cam_radius * cos(cam_angle_y)])
+                            forward = -cam_pos / np.linalg.norm(cam_pos)
+                            up = np.array([0, 0, 1])
+                            right = np.cross(forward, up)
+                            up = np.cross(right, forward)
+                            pixel_dir = forward + ndc_x * right * math.tan(fov / 2) * aspect + ndc_y * up * math.tan(fov / 2)
+                            pixel_dir = pixel_dir / np.linalg.norm(pixel_dir)
+                            hit = ray_sphere_intersection(cam_pos, pixel_dir)
+                            if hit is not None:
+                                region = position_to_nearest_region(hit)
+                                selected_region = tuple(region)
+                            else:
+                                selected_region = None
+                    is_dragging = False
+                    last_mouse_pos = None
+                    
+            elif event.type == pygame.MOUSEMOTION:
+                if is_dragging and last_mouse_pos is not None:
+                    current_pos = event.pos
+                    dx = current_pos[0] - last_mouse_pos[0]
+                    dy = current_pos[1] - last_mouse_pos[1]
+                    
+                    # Update camera angles based on mouse movement
+                    cam_angle_x += dx * 0.01  # Horizontal rotation (swapped direction)
+                    cam_angle_y = max(cam_angle_y_min, min(pi - cam_angle_y_min, cam_angle_y - dy * 0.01))  # Vertical rotation with limits
+                    
+                    last_mouse_pos = current_pos
+                    
+            elif event.type == pygame.MOUSEWHEEL:
+                # Zoom in/out with scroll wheel
+                zoom_factor = 0.1
+                if event.y > 0:  # Scroll up - zoom in
+                    cam_radius = max(cam_radius_min, cam_radius - zoom_factor)
+                elif event.y < 0:  # Scroll down - zoom out
+                    cam_radius += zoom_factor
 
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE and selected_region is not None:
                     result = region_to_border_regions(list(selected_region))
                     neighbor_regions = [tuple(r) for r in result] if result else []
-                elif event.key == pygame.K_LEFT:
-                    cam_angle_x -= cam_angle_step
-                elif event.key == pygame.K_RIGHT:
-                    cam_angle_x += cam_angle_step
-                elif event.key == pygame.K_UP:
-                    cam_angle_y = max(cam_angle_y_min, cam_angle_y - cam_angle_step)
-                elif event.key == pygame.K_DOWN:
-                    cam_angle_y = min(pi - cam_angle_y_min, cam_angle_y + cam_angle_step)
-                elif event.key == pygame.K_PERIOD:  # . key for zoom in
-                    cam_radius = max(cam_radius_min, cam_radius - cam_radius_step)
-                elif event.key == pygame.K_SLASH:  # / key for zoom out
-                    cam_radius += cam_radius_step
 
         screen.fill(color_black)
         cam_pos = np.array([cam_radius * cos(cam_angle_x) * sin(cam_angle_y),
