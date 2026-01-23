@@ -3,3 +3,6 @@ venv
 .idea
 .DS_Store
 images
+2d
+models
+testing_point_structres

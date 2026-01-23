@@ -170,7 +170,7 @@ def region_to_border_regions(region: list) -> list:
             border_regions.append([face, d1 + 1, d2])
             border_regions.append([face, d1, d2 + 1])
     return border_regions
-
+'''
 def region_to_position(region: tuple) -> np.ndarray:
     # Convert tuple back to list for internal processing.
     region_list = list(region)
@@ -195,6 +195,26 @@ def region_to_position(region: tuple) -> np.ndarray:
     pos = np.dot(np.array(matrix_coords), face_transform[face]) + face_origin[face]
     return pos / np.linalg.norm(pos)
 
+def get_offset_cheating(approx_region: list, point: list) -> list:
+    candidates = [approx_region] + region_to_border_regions(approx_region)
+    best_region = approx_region
+    best_dist = float('inf')
+    for candidate in candidates:
+        # Cache key conversion (lists to tuples) for region_to_position.
+        candidate_key = tuple(candidate)
+        pos_candidate = region_to_position(candidate_key)
+        d = (pos_candidate[0] - point[0]) ** 2 + (pos_candidate[1] - point[1]) ** 2 + (pos_candidate[2] - point[2]) ** 2
+        if d < best_dist:
+            best_dist = d
+            best_region = candidate
+    if best_region == approx_region:
+        return best_region, (0, 0)
+    elif len(best_region) == len(approx_region) == 3:
+        return best_region, (best_region[1] - approx_region[1], best_region[2] - approx_region[2])
+    else:
+        # bloddy edge case just get it wrong
+        return best_region, (0, 0)
+        
 def point_in_triangle(P, tri):
     """
     Check if point P = (px, py) lies inside triangle tri = [(x1,y1), (x2,y2), (x3,y3)]
@@ -213,7 +233,7 @@ def point_in_triangle(P, tri):
     has_pos = (d1 > 0) or (d2 > 0) or (d3 > 0)
 
     return not (has_neg and has_pos)
-
+'''
 def predict_round_offset(matrix_coords) -> list:
     # if matrix_coords fits into some rounding triangle then we will only return that round offset
     # The V1+ triangle has corners [1/2, 0], [1/3, 1/3], [1/2, 1/2]
@@ -236,26 +256,6 @@ def predict_round_offset(matrix_coords) -> list:
         return (0, -1)
 
     return (0, 0)
-
-def get_offset_cheating(approx_region: list, point: list) -> list:
-    candidates = [approx_region] + region_to_border_regions(approx_region)
-    best_region = approx_region
-    best_dist = float('inf')
-    for candidate in candidates:
-        # Cache key conversion (lists to tuples) for region_to_position.
-        candidate_key = tuple(candidate)
-        pos_candidate = region_to_position(candidate_key)
-        d = (pos_candidate[0] - point[0]) ** 2 + (pos_candidate[1] - point[1]) ** 2 + (pos_candidate[2] - point[2]) ** 2
-        if d < best_dist:
-            best_dist = d
-            best_region = candidate
-    if best_region == approx_region:
-        return best_region, (0, 0)
-    elif len(best_region) == len(approx_region) == 3:
-        return best_region, (best_region[1] - approx_region[1], best_region[2] - approx_region[2])
-    else:
-        # bloddy edge case just get it wrong
-        return best_region, (0, 0)
 
 def face_coords_to_region(face_coords: list, sorted_corners: list, face: int) -> list:
     if face_coords == [0, 0]:

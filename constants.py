@@ -5,7 +5,7 @@ import numpy as np
 # =============================================================================
 
 # Basic geometric parameters
-edge_length = 1000 # Goal is to push to 4096 number of regions is 10*x^2+2 
+edge_length = 10 # Goal is to push to 4096 number of regions is 10*x^2+2 
 
 # Screen/display constants
 screen_width = 800
