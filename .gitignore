@@ -5,4 +5,4 @@ venv
 images
 2d
 models
-testing_point_structres
+*.kml
